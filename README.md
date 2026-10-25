@@ -359,5 +359,16 @@ Unmanaged switches have **no IGMP querier**, meaning Dante multicast and AES67 s
 
 ---
 
+## ⚠️ Disclaimer & Limitation of Liability
+
+> **IMPORTANT NOTICE:** You use this software and all associated scripts entirely at your own risk. The author(s), maintainer(s), and contributor(s) assume **zero liability** for any damages, hardware failure, show interruptions, equipment damage, or data loss.
+
+* **"AS IS" & No Warranty:** This project is provided "AS IS" without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.
+* **No Show Guarantee:** Live production environments carry inherent operational risks. You are solely responsible for thoroughly bench-testing all signal chains, network paths, and hardware redundancies prior to showtime. The author(s) accept no responsibility for show dropouts, audio pops, lighting blackouts, or network failures during live events.
+* **Hardware & Firmware Responsibility:** You acknowledge that modifying router configurations, running custom shell scripts, flashing memory partitions, or connecting hardware involves technical risk. The author(s) shall not be held liable for bricked hardware, boot loops, overheating, loss of vendor warranty, or damage to any connected AV gear (mixers, stageboxes, lighting nodes, computers, amplifiers).
+* **Limitation of Damages:** In no event shall the author(s) or copyright holders be liable for any direct, indirect, incidental, special, exemplary, punitive, or consequential damages (including, but not limited to, procurement of substitute goods or services, loss of use, data, or profits, or business interruption) however caused and on any theory of liability, whether in contract, strict liability, or tort (including negligence or otherwise).
+
+---
+
 ## 📜 License
 This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See [LICENSE](LICENSE) for details.
