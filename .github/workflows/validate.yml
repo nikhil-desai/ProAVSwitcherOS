@@ -1,0 +1,34 @@
+name: Validate & Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Check POSIX Shell Script Syntax (sh -n)
+        run: |
+          echo "Checking syntax of all shell scripts..."
+          for script in $(find . -name "*.sh" -o -name "*.cgi"); do
+            echo "Linting: $script"
+            sh -n "$script"
+          done
+          echo "All shell scripts passed syntax validation."
+
+      - name: Check Python Syntax (py_compile)
+        run: |
+          echo "Checking syntax of all Python scripts..."
+          python3 -m py_compile installer/deploy.py core/layer4-dashboard/osc_companion_server.py
+          echo "All Python scripts passed compilation."
