@@ -1,16 +1,11 @@
-// StageSwitch OS - Native C1000A Web UI Loader & Application
-// Hosted directly on Actiontec C1000A (Broadcom BCM63168 MIPS32)
+// ProAVSwitcherOS - Universal Pro-AV Web UI Loader & Application
+// Compatible with Broadcom micro_httpd, OpenWrt uhttpd, BusyBox httpd & Nginx
 (function() {
+  if (window.__proav_loaded) return;
+  window.__proav_loaded = true;
   let isMounted = false;
   let isShowLocked = false;
   let currentState = { profile: 'tour', igmp_querier: 'on', usb_mounted: true, ports: [] };
-
-  const isHostedOnC1000A = (
-    window.location.hostname === '192.168.10.1' ||
-    window.location.hostname === '192.168.0.1' ||
-    window.location.hostname === '10.10.10.1' ||
-    window.location.hostname === '169.254.10.1'
-  );
 
   async function fetchWithTimeout(url, timeoutMs, opts = {}) {
     const ctrl = new AbortController();
@@ -22,42 +17,35 @@
     }
   }
 
-  async function fetchStatusFromC1000A() {
-    // Broadcom micro_httpd does not support query strings on static files (e.g. ?t=...)
-    // cache: 'no-store' in fetchWithTimeout already bypasses the browser HTTP cache cleanly.
-    const res = await fetchWithTimeout('/css/pop_up.css', 1500);
-    if (!res.ok) throw new Error('C1000A telemetry unreachable: HTTP ' + res.status);
-    const text = await res.text();
-    if (!text || !text.trim().startsWith('{')) {
-      throw new Error('Invalid telemetry payload from C1000A');
-    }
-    const data = JSON.parse(text);
-    return data;
-  }
-
-  async function fetchStatusWithFailover(query) {
-    if (isHostedOnC1000A) {
-      return await fetchStatusFromC1000A();
+  async function fetchStatusWithFailover() {
+    const endpoints = ['/css/pop_up.css', '/telemetry.json', '/cgi-bin/api.cgi?action=telemetry'];
+    for (const ep of endpoints) {
+      try {
+        const res = await fetchWithTimeout(ep, 1200);
+        if (res.ok) {
+          const text = await res.text();
+          if (text && text.trim().startsWith('{')) {
+            return JSON.parse(text);
+          }
+        }
+      } catch (e) {}
     }
     try {
-      const res = await fetchWithTimeout('/cgi-bin/api.cgi?' + query, 850);
-      if (res.ok) {
-        const d = await res.json();
-        if (d && d.c1000a_standalone_ready) {
-          window.location.replace('http://192.168.10.1/');
-        }
-        return d;
-      }
+      const resLocal = await fetchWithTimeout('http://127.0.0.1:8080/cgi-bin/api.cgi?action=telemetry', 700);
+      if (resLocal.ok) return await resLocal.json();
     } catch (e) {}
-    const resLocal = await fetchWithTimeout('http://127.0.0.1:8080/cgi-bin/api.cgi?' + query, 700);
-    if (resLocal.ok) return await resLocal.json();
-    throw new Error('Unreachable');
+    throw new Error('Switch telemetry unreachable');
   }
 
-  async function sendC1000ACommandPortKnock(port) {
-    const host = isHostedOnC1000A ? window.location.hostname : '192.168.10.1';
+  async function sendSwitchCommand(port, actionName) {
+    const host = window.location.hostname || '192.168.1.1';
     try {
       await fetchWithTimeout(`http://${host}:${port}/`, 400, { mode: 'no-cors' });
+    } catch (e) {}
+    try {
+      await fetchWithTimeout(`/cgi-bin/api.cgi?action=${actionName}`, 500);
+    } catch (e) {}
+  }
     } catch (e) {
       // Expected immediate TCP RST once iptables SS_CMD rule fires
     }
@@ -89,8 +77,8 @@
       return;
     }
     const portMap = { tour: 19001, corporate: 19002, flat: 19003 };
-    if (isHostedOnC1000A && portMap[mode]) {
-      sendC1000ACommandPortKnock(portMap[mode]);
+    if (portMap[mode]) {
+      sendSwitchCommand(portMap[mode], mode);
     } else {
       callApi('cmd=profile&mode=' + encodeURIComponent(mode));
     }
@@ -101,9 +89,7 @@
       alert('SHOW LOCKOUT ACTIVE: Unlock show controls first.');
       return;
     }
-    if (isHostedOnC1000A) {
-      sendC1000ACommandPortKnock(19004);
-    } else {
+    sendSwitchCommand(19004, 'querier'); else {
       const next = currentState.igmp_querier === 'on' ? 'off' : 'on';
       callApi('cmd=querier&state=' + next);
     }
@@ -131,8 +117,8 @@
       run_qa_cert: 19016,
       stealth_toggle: 19017
     };
-    if (isHostedOnC1000A && portMap[cmd]) {
-      sendC1000ACommandPortKnock(portMap[cmd]);
+    if (portMap[cmd]) {
+      sendSwitchCommand(portMap[cmd], cmd);
     } else {
       callApi('cmd=' + encodeURIComponent(cmd));
     }
@@ -819,7 +805,7 @@
             </div>
             <div class="metric-box">
               <div class="metric-label">Pocket FOH Wi-Fi AP (wl0)</div>
-              <div class="metric-val ok" id="wifiStatusVal">StageSwitch-FOH ON</div>
+              <div class="metric-val ok" id="wifiStatusVal">ProAV-FOH ON</div>
             </div>
             <div class="metric-box">
               <div class="metric-label">IP Addressing Mode (br0)</div>
@@ -838,8 +824,8 @@
         <!-- Hardware Switch Port Telemetry with Live Bandwidth Gauges -->
         <section class="card">
           <div class="card-header">
-            <span class="card-title">Broadcom BCM63168 Physical Switch Ports · Real-Time Throughput (Mbps) & Device Recognition</span>
-            <span class="pill ok" id="fdbSyncBadge">C1000A Native Switch OS</span>
+            <span class="card-title">Physical Switch Ports · Real-Time Throughput (Mbps) &amp; Device Recognition</span>
+            <span class="pill ok" id="fdbSyncBadge">ProAVSwitcherOS Core</span>
           </div>
           <table>
             <thead>

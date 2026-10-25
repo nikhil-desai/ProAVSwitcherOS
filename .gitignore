@@ -1,0 +1,21 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+venv/
+ENV/
+
+# Temporary capture files
+*.pcap
+*.cap
+
+# Runtime state directories
+state/
+tmp/
+.probe_test
