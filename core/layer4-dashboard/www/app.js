@@ -41,14 +41,12 @@
     const host = window.location.hostname || '192.168.1.1';
     try {
       await fetchWithTimeout(`http://${host}:${port}/`, 400, { mode: 'no-cors' });
-    } catch (e) {}
-    try {
-      await fetchWithTimeout(`/cgi-bin/api.cgi?action=${actionName}`, 500);
-    } catch (e) {}
-  }
     } catch (e) {
       // Expected immediate TCP RST once iptables SS_CMD rule fires
     }
+    try {
+      await fetchWithTimeout(`/cgi-bin/api.cgi?action=${actionName}`, 500);
+    } catch (e) {}
     setTimeout(() => callApi('cmd=status'), 450);
   }
 
@@ -89,10 +87,7 @@
       alert('SHOW LOCKOUT ACTIVE: Unlock show controls first.');
       return;
     }
-    sendSwitchCommand(19004, 'querier'); else {
-      const next = currentState.igmp_querier === 'on' ? 'off' : 'on';
-      callApi('cmd=querier&state=' + next);
-    }
+    sendSwitchCommand(19004, 'querier');
   }
 
   function triggerAction(cmd) {

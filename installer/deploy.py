@@ -81,9 +81,9 @@ class TelnetSession:
                 pass
         return buf.decode("latin1", errors="ignore")
 
-    def send_cmd(self, cmd, wait_prompt="# ", timeout=8):
+    def send_cmd(self, cmd, wait_prompt="\n# ", timeout=8):
         self.sock.sendall((cmd + "\n").encode())
-        return self.read_until([wait_prompt, "$ ", "> "], timeout=timeout)
+        return self.read_until([wait_prompt, "\n$ ", "\n> ", "# "], timeout=timeout)
 
     def login(self, username, password):
         txt = self.read_until(["Login: ", "login: ", "Username: "], timeout=6)
@@ -146,12 +146,18 @@ def main():
         probe_info = {"platform_family": "generic-linux", "persist_dir": "/tmp", "web_root": "/www"}
 
     target_dir = "/var/proav"
-    persist_dir = probe_info.get("persist_dir", "/data")
-    if args.ram_only or not persist_dir:
+    persist_base = probe_info.get("persist_dir", "/data")
+    if args.ram_only or not persist_base:
         persist_dir = "/var/proav"
+    else:
+        persist_dir = f"{persist_base}/proav" if persist_base in ("/data", "/overlay") else persist_base
 
     print(f"[ProAVSwitcherOS] Staging core payload (Destination: {persist_dir})...")
-    session.send_cmd(f"mkdir -p {persist_dir}/bin {persist_dir}/hal {target_dir}/bin {target_dir}/state {target_dir}/www")
+    session.send_cmd(f"mkdir -p {persist_dir}/bin {persist_dir}/hal {target_dir}/state /var/stageswitch/state")
+    if persist_dir != target_dir:
+        session.send_cmd(f"rm -rf {target_dir}/bin {target_dir}/hal 2>/dev/null")
+        session.send_cmd(f"ln -sf {persist_dir}/bin {target_dir}/bin 2>/dev/null")
+        session.send_cmd(f"ln -sf {persist_dir}/hal {target_dir}/hal 2>/dev/null")
     
     # Download scripts
     hal_url = f"http://{local_ip}:{http_port}/core/hal/hal-common.sh"
@@ -163,14 +169,23 @@ def main():
     session.send_cmd(f"wget -O {persist_dir}/hal/hal-common.sh {hal_url} && chmod +x {persist_dir}/hal/hal-common.sh")
     session.send_cmd(f"wget -O {persist_dir}/bin/profile-ctl.sh {ctl_url} && chmod +x {persist_dir}/bin/profile-ctl.sh")
     session.send_cmd(f"wget -O {persist_dir}/bin/av-auditor.sh {aud_url} && chmod +x {persist_dir}/bin/av-auditor.sh")
-    session.send_cmd(f"cp -r {persist_dir}/* {target_dir}/ 2>/dev/null")
 
     # Bind Dashboard to Web Server
     web_root = probe_info.get("web_root", "/webs")
     print(f"[ProAVSwitcherOS] Binding Web Dashboard to router web root ({web_root})...")
     session.send_cmd("mount -o remount,rw / 2>/dev/null")
+    session.send_cmd(f"[ ! -f {web_root}/login.html.orig ] && cp {web_root}/login.html {web_root}/login.html.orig 2>/dev/null")
+    session.send_cmd(f"[ ! -f {web_root}/modemstatus_home.html.orig ] && cp {web_root}/modemstatus_home.html {web_root}/modemstatus_home.html.orig 2>/dev/null")
+    session.send_cmd(f"[ ! -f {web_root}/index.html.orig ] && cp {web_root}/index.html {web_root}/index.html.orig 2>/dev/null")
     session.send_cmd(f"wget -O {web_root}/index.html {htm_url} 2>/dev/null || cp {htm_url} {web_root}/index.html")
+    session.send_cmd(f"wget -O {web_root}/login.html {htm_url} 2>/dev/null || cp {htm_url} {web_root}/login.html")
+    session.send_cmd(f"wget -O {web_root}/modemstatus_home.html {htm_url} 2>/dev/null || cp {htm_url} {web_root}/modemstatus_home.html")
     session.send_cmd(f"wget -O {web_root}/js/pop_up.js {app_url} 2>/dev/null || cp {app_url} {web_root}/js/pop_up.js")
+    session.send_cmd(f"wget -O {web_root}/app.js {app_url} 2>/dev/null || cp {app_url} {web_root}/app.js")
+    if web_root == "/webs":
+        session.send_cmd("mkdir -p /webs/css 2>/dev/null")
+        session.send_cmd("mount -t tmpfs -o size=64k tmpfs /webs/css 2>/dev/null")
+    session.send_cmd("ln -sf /var/proav/state/telemetry.json /var/stageswitch/state/telemetry.json 2>/dev/null")
     session.send_cmd("mount -o remount,ro / 2>/dev/null")
 
     # Start Auditor Daemon

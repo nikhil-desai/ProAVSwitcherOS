@@ -10,17 +10,35 @@
 export PATH="/bin:/sbin:/usr/bin:/usr/sbin:$PATH"
 
 # Architecture & Kernel
-ARCH=$(uname -m 2>/dev/null || echo "unknown")
-KERNEL=$(uname -r 2>/dev/null || echo "unknown")
+ARCH=$(uname -m 2>/dev/null)
+if [ -z "$ARCH" ] || [ "$ARCH" = "unknown" ]; then
+    if grep -qi "broadcom" /proc/cpuinfo 2>/dev/null || grep -qi "mips" /proc/cpuinfo 2>/dev/null; then
+        ARCH="mips"
+    elif grep -qi "arm" /proc/cpuinfo 2>/dev/null; then
+        ARCH="arm"
+    else
+        ARCH="unknown"
+    fi
+fi
+KERNEL=$(uname -r 2>/dev/null)
+if [ -z "$KERNEL" ] || [ "$KERNEL" = "unknown" ]; then
+    if [ -f /proc/version ]; then
+        read -r _ _ KERNEL _ < /proc/version 2>/dev/null
+    fi
+fi
+KERNEL="${KERNEL:-unknown}"
 HOSTNAME=$(hostname 2>/dev/null || echo "target-router")
 
 # Endianness detection
 ENDIAN="unknown"
-if [ -f /bin/sh ]; then
-    case $(od -A n -N 1 -j 5 -t x1 /bin/sh 2>/dev/null | tr -d ' ') in
+if [ -f /bin/sh ] && [ -x /usr/bin/od -o -x /bin/od ]; then
+    case $(od -A n -N 1 -j 5 -t x1 /bin/sh 2>/dev/null | tr -d ' ' 2>/dev/null) in
         01) ENDIAN="little" ;;
         02) ENDIAN="big" ;;
     esac
+fi
+if [ "$ENDIAN" = "unknown" ] && [ "$ARCH" = "mips" ]; then
+    ENDIAN="big"
 fi
 
 # Detect platform family
@@ -54,7 +72,7 @@ MAX_FREE_KB=0
 check_writable() {
     cand="$1"
     if [ -d "$cand" ]; then
-        if touch "$cand/.probe_test" 2>/dev/null; then
+        if (echo test > "$cand/.probe_test") 2>/dev/null; then
             rm -f "$cand/.probe_test" 2>/dev/null
             free_kb=$(df -k "$cand" 2>/dev/null | tail -n 1 2>/dev/null | awk '{print $4}' 2>/dev/null)
             if [ -z "$free_kb" ]; then
@@ -78,6 +96,11 @@ for dir in /data /overlay /etc/config /etc /opt /mnt /var /tmp; do
     check_writable "$dir"
 done
 
+# On Broadcom CPE, /data is dedicated writable flash (avoid filling /etc rootfs)
+if [ "$PLATFORM" = "broadcom-cpe" ] && [ -d /data ]; then
+    BEST_PERSIST_DIR="/data"
+fi
+
 # Switch & Networking Capabilities
 HAS_ETHSWCTL="false"
 HAS_SWCONFIG="false"
@@ -100,19 +123,19 @@ HAS_EPI_TTCP="false"
 # Web Server Detection
 WEB_SERVER="none"
 WEB_ROOT=""
-if pidof micro_httpd >/dev/null 2>&1; then
+if pidof micro_httpd >/dev/null 2>&1 || ps 2>/dev/null | grep -q "[m]icro_httpd" || [ -d /webs ]; then
     WEB_SERVER="micro_httpd"
     WEB_ROOT="/webs"
-elif pidof uhttpd >/dev/null 2>&1; then
+elif pidof uhttpd >/dev/null 2>&1 || ps 2>/dev/null | grep -q "[u]httpd"; then
     WEB_SERVER="uhttpd"
     WEB_ROOT="/www"
-elif pidof httpd >/dev/null 2>&1; then
+elif pidof httpd >/dev/null 2>&1 || ps 2>/dev/null | grep -q "[h]ttpd"; then
     WEB_SERVER="httpd"
-    [ -d /www ] && WEB_ROOT="/www"
     [ -d /webs ] && WEB_ROOT="/webs"
+    [ -d /www ] && WEB_ROOT="/www"
     [ -d /var/www ] && WEB_ROOT="/var/www"
     [ -d /usr/share/nginx/html ] && WEB_ROOT="/usr/share/nginx/html"
-elif pidof nginx >/dev/null 2>&1; then
+elif pidof nginx >/dev/null 2>&1 || ps 2>/dev/null | grep -q "[n]ginx"; then
     WEB_SERVER="nginx"
     WEB_ROOT="/var/www/html"
 fi

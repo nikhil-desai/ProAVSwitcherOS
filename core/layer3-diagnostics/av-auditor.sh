@@ -13,7 +13,7 @@ STATE_DIR="$PROAV_ROOT/state"
 USB_MNT="$PROAV_ROOT/usb"
 STATUS_JSON="$STATE_DIR/telemetry.json"
 LATEST_PCAP="$STATE_DIR/latest.pcap"
-mkdir -p "$STATE_DIR" "$USB_MNT" "$PROAV_ROOT/www"
+mkdir -p "$STATE_DIR" "$USB_MNT" "$PROAV_ROOT/www" /var/stageswitch/state
 
 LAST_LINK_SIG=""
 PROBE_TICK=0
@@ -384,44 +384,47 @@ collect_once() {
     QA_CERT_SUMMARY=$(read_first_line "$STATE_DIR/qa_cert_summary" "Ready: Click 'Run Pre-Show QA Audit' to generate signed test report.")
     LAST_CERT_ID=$(read_first_line "$STATE_DIR/last_qa_cert_id" "NONE")
 
-    cat > "$STATUS_JSON" <<EOF
-{
-  "timestamp": $UPTIME_SEC,
-  "board": "ProAVSwitcherOS Universal Bridge",
-  "profile": "$PROFILE",
-  "igmp_querier": "$QUERIER",
-  "igmp_groups": $IGMP_COUNT,
-  "mdns_joined": $MDNS_ACTIVE,
-  "ptp_status": "$PTP_STATE",
-  "dscp_ef_verified": $DSCP_EF_OK,
-  "stress_test": "$STRESS_STATE",
-  "chaos_mode": "$CHAOS_MODE",
-  "eee_pause_mode": "$EEE_MODE",
-  "wifi_ap_state": "$WIFI_STATE",
-  "dhcp_mode": "$DHCP_MODE",
-  "led_status": "GREEN (ProAV Lock)",
-  "proto_summary": "$PROTO_SUMMARY",
-  "mcast_proof": "$MCAST_PROOF",
-  "pcap_ready": $PCAP_READY,
-  "usb_mounted": false,
-  "usb_needs_insert": false,
-  "usb_warning": "OK: Internal Flash Mode Active.",
-  "ptp_grandmaster": "$PTP_GM",
-  "ptp_jitter_us": $PTP_JITTER,
-  "ptp_clock_state": "$PTP_CLK_STATE",
-  "lighting_summary": "$LIGHTING_SUMMARY",
-  "dmx_blast_status": "$DMX_STATUS",
-  "tone_status": "$TONE_STATUS",
-  "tone_active": $TONE_ACTIVE,
-  "stealth_mode": "$STEALTH_MODE",
-  "qa_cert_summary": "$QA_CERT_SUMMARY",
-  "last_qa_cert_id": "$LAST_CERT_ID",
-  "uptime_sec": $UPTIME_SEC,
-  "mem_free_kb": $MEM_FREE,
-  "mem_total_kb": $MEM_TOTAL,
-  "ports": [$PORTS_JSON]
-}
-EOF
+    {
+      echo "{"
+      echo "  \"timestamp\": ${UPTIME_SEC:-0},"
+      echo "  \"board\": \"ProAVSwitcherOS Universal Bridge\","
+      echo "  \"profile\": \"$PROFILE\","
+      echo "  \"igmp_querier\": \"$QUERIER\","
+      echo "  \"igmp_groups\": ${IGMP_COUNT:-0},"
+      echo "  \"mdns_joined\": ${MDNS_ACTIVE:-false},"
+      echo "  \"ptp_status\": \"$PTP_STATE\","
+      echo "  \"dscp_ef_verified\": ${DSCP_EF_OK:-true},"
+      echo "  \"stress_test\": \"$STRESS_STATE\","
+      echo "  \"chaos_mode\": \"$CHAOS_MODE\","
+      echo "  \"eee_pause_mode\": \"$EEE_MODE\","
+      echo "  \"wifi_ap_state\": \"$WIFI_STATE\","
+      echo "  \"dhcp_mode\": \"$DHCP_MODE\","
+      echo "  \"led_status\": \"GREEN (ProAV Lock)\","
+      echo "  \"proto_summary\": \"$PROTO_SUMMARY\","
+      echo "  \"mcast_proof\": \"$MCAST_PROOF\","
+      echo "  \"pcap_ready\": ${PCAP_READY:-false},"
+      echo "  \"usb_mounted\": false,"
+      echo "  \"usb_needs_insert\": false,"
+      echo "  \"usb_warning\": \"OK: Internal Flash Mode Active.\","
+      echo "  \"ptp_grandmaster\": \"$PTP_GM\","
+      echo "  \"ptp_jitter_us\": ${PTP_JITTER:-0},"
+      echo "  \"ptp_clock_state\": \"$PTP_CLK_STATE\","
+      echo "  \"lighting_summary\": \"$LIGHTING_SUMMARY\","
+      echo "  \"dmx_blast_status\": \"$DMX_STATUS\","
+      echo "  \"tone_status\": \"$TONE_STATUS\","
+      echo "  \"tone_active\": ${TONE_ACTIVE:-false},"
+      echo "  \"stealth_mode\": \"$STEALTH_MODE\","
+      echo "  \"qa_cert_summary\": \"$QA_CERT_SUMMARY\","
+      echo "  \"last_qa_cert_id\": \"$LAST_CERT_ID\","
+      echo "  \"uptime_sec\": ${UPTIME_SEC:-0},"
+      echo "  \"mem_free_kb\": ${MEM_FREE:-0},"
+      echo "  \"mem_total_kb\": ${MEM_TOTAL:-0},"
+      echo "  \"ports\": [$PORTS_JSON]"
+      echo "}"
+    } > "$STATUS_JSON"
+    cp "$STATUS_JSON" /var/stageswitch/state/telemetry.json 2>/dev/null || true
+    [ -d /webs/css ] && cp "$STATUS_JSON" /webs/css/pop_up.css 2>/dev/null || true
+    [ -d /webs ] && cp "$STATUS_JSON" /webs/telemetry.json 2>/dev/null || true
 }
 
 probe_ptp() {
